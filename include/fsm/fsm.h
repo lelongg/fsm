@@ -1,129 +1,159 @@
 #ifndef FSM_H
 #define FSM_H
 
-#include <atomic>
-#include <type_traits>
 #include <initializer_list>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <type_traits>
+#include <vector>
 
-template <class...>
-struct conjunction : std::true_type
+template <typename EventType>
+struct VirtualTransition
 {
-};
-template <class B1>
-struct conjunction<B1> : B1
-{
-};
-template <class B1, class... Bn>
-struct conjunction<B1, Bn...>
-    : std::conditional_t<bool(B1::value), conjunction<Bn...>, B1>
-{
+    void operator()(const EventType&) {}
 };
 
-using StateType = int;
-
-struct Event;
-
-struct VirtualState
+template <typename StateType, StateType FromState, typename EventType, StateType ToState>
+struct Transition : VirtualTransition<EventType>
 {
-};
-
-template <StateType state_value>
-struct State : VirtualState
-{
-    static const StateType value = state_value;
-};
-
-template <StateType state, StateType other_state>
-struct is_same_state : std::false_type
-{
-};
-
-template <StateType state>
-struct is_same_state<state, state> : std::true_type
-{
-};
-
-template <typename FromStateType, typename EventType, typename ToState>
-class Transition
-{
-public:
-    using FromState = FromStateType;
     using Event = EventType;
-    static const StateType from_state = FromState::value;
-    static const StateType to_state = ToState::value;
+    static const StateType from_state = FromState;
+    static const StateType to_state = ToState;
 };
 
-template <typename Transition, typename... Transitions>
-constexpr std::initializer_list<StateType> buildTransitionMap()
+template <class Function, typename Index, std::underlying_type_t<Index>... Indices>
+constexpr auto make_array_helper(
+    Function f,
+    Index,
+    std::integer_sequence<std::underlying_type_t<Index>, Indices...>)
+    -> std::array<
+        typename std::result_of<Function(std::underlying_type_t<Index>)>::type,
+        sizeof...(Indices)>
 {
-    return {Transition::to_state, buildTransitionMap<Transitions...>()};
+    return {{f(Indices)...}};
 }
 
-template <typename Transition>
-constexpr std::initializer_list<StateType> buildTransitionMap()
+template <typename Index, std::underlying_type_t<Index> N, typename Function>
+constexpr auto make_array(Function f)
+    -> std::array<typename std::result_of<Function(std::underlying_type_t<Index>)>::type, N>
 {
-    return {Transition::to_state};
+    return make_array_helper(
+        f, Index(), std::make_integer_sequence<std::underlying_type_t<Index>, N>{});
 }
 
-template <typename... Transitions>
-struct TransitionMap
+template <typename StateType, typename... Transitions>
+struct TransitionHelper;
+
+template <typename StateType, typename... Transitions>
+struct TransitionTable;
+
+template <typename StateType, typename Transition, typename... Transitions>
+struct TransitionTable<StateType, Transition, Transitions...>
+    : TransitionTable<StateType, Transitions...>
 {
-    static constexpr StateType transition_map[] = buildTransitionMap<Transitions...>();
+    template <typename EventType = typename Transition::Event>
+    struct TransitionList
+    {
+        using TransitionHelper_ =
+            TransitionHelper<StateType, Transition, Transitions...>;
+
+        static constexpr auto max_state = TransitionHelper_::maxState();
+
+        static constexpr auto transitions =
+            make_array<StateType, max_state + 1>(TransitionHelper_::getToState);
+    };
 };
 
-template <typename Transition, typename... Transitions>
-class TransitionTable : public TransitionTable<Transitions...>
+template <typename StateType>
+struct TransitionTable<StateType>
 {
-public:
-    template <
-        StateType from_state_value,
-        typename Event,
-        typename = std::enable_if_t<conjunction<
-            is_same_state<from_state_value, Transition::FromState::value>,
-            std::is_same<Event, typename Transition::Event>>::value>>
-
-        inline constexpr static StateType nextState()
+    template <typename EventType>
+    struct TransitionList
     {
-        return Transition::to_state;
+        using TransitionHelper_ = TransitionHelper<StateType>;
+
+        static constexpr auto max_state = TransitionHelper_::maxState();
+
+        static constexpr auto transitions =
+            make_array<StateType, max_state + 1>(TransitionHelper_::getToState);
+    };
+};
+
+template <typename StateType, typename Transition, typename... Transitions>
+struct TransitionHelper<StateType, Transition, Transitions...>
+{
+    static constexpr std::underlying_type_t<StateType> maxState()
+    {
+        constexpr auto from_state =
+            static_cast<std::underlying_type_t<StateType>>(Transition::from_state);
+        constexpr auto to_state =
+            static_cast<std::underlying_type_t<StateType>>(Transition::to_state);
+        return std::max(
+            std::max(from_state, to_state),
+            TransitionHelper<StateType, Transitions...>::maxState());
+    }
+
+    static constexpr StateType getToState(const std::underlying_type_t<StateType> from_state)
+    {
+        if (StateType(from_state) == Transition::from_state)
+        {
+            return Transition::to_state;
+        }
+        else if (
+            TransitionTable<StateType, Transitions...>::template TransitionList<
+                typename Transition::Event>::max_state
+            > 0)
+        {
+            return TransitionTable<StateType, Transitions...>::template TransitionList<
+                typename Transition::Event>::transitions[from_state];
+        }
+        else
+        {
+            return StateType(from_state);
+        }
     }
 };
 
-template <typename Transition>
-class TransitionTable<Transition>
+template <typename StateType>
+struct TransitionHelper<StateType>
 {
-public:
-    template <
-        StateType from_state_value,
-        typename Event,
-        typename = std::enable_if_t<conjunction<
-            is_same_state<from_state_value, Transition::FromState::value>,
-            std::is_same<Event, typename Transition::Event>>::value>>
-
-    inline constexpr static StateType nextState()
+    static constexpr std::underlying_type_t<StateType> maxState()
     {
-        return Transition::to_state;
+        return static_cast<std::underlying_type_t<StateType>>(StateType());
+    }
+
+    static constexpr StateType getToState(const std::underlying_type_t<StateType> from_state)
+    {
+        return StateType(from_state);
     }
 };
 
-template <typename TransitionTable>
-class FSM
+template <typename StateType, typename... Transitions>
+struct FSM
 {
-public:
+    template <typename Event>
+    using TransitionList =
+        typename TransitionTable<StateType, Transitions...>::template TransitionList<Event>;
 
-    void process(const Event&)
+    FSM(StateType initial_state) : state_(initial_state) {}
+
+    template <typename Event>
+    StateType process(const Event&)
     {
-        state_ = new State<0>;
-//         current_state_ = TransitionTable::template nextState<Event>(current_state_);
+        const auto state_as_underlying_type =
+            static_cast<std::underlying_type_t<StateType>>(state_);
+        std::cout << TransitionList<Event>::max_state << '\t'
+                  << state_as_underlying_type << std::endl;
+        if (TransitionList<Event>::max_state >= state_as_underlying_type)
+        {
+            state_ = TransitionList<Event>::transitions[state_as_underlying_type];
+        }
+
+        return state_;
     }
 
-    StateType state() const
-    {
-        return current_state_;
-    }
-
-private:
-    std::atomic<StateType> current_state_;
-    VirtualState * state_;
+    StateType state_;
 };
 
 #endif

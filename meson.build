@@ -1,4 +1,4 @@
-project('fsm', 'cpp', default_options : ['cpp_std=c++14'])
+project('fsm', 'cpp', default_options : ['cpp_std=c++17'])
 
 include_dir = include_directories('include')
 
