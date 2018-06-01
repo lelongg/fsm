@@ -38,17 +38,11 @@ constexpr string_view get_name()
     return {};
 }
 
-template <typename T>
-constexpr auto type_name_length = get_name<T>().size;
+struct Event {};
+struct Event0 {};
+struct Event1 {};
 
-struct Event
-{};
-struct Event0
-{};
-struct Event1
-{};
-
-enum class State
+enum State
 {
     NotInitialized,
     Initialized,
@@ -58,40 +52,55 @@ enum class State
 
 TEST_CASE("Transition creation")
 {
-    Transition<State, State::Started, Event0, State::Stopped> transition;
+    using FSM::Transition;
+
+    Transition<State, Started, Event0, Stopped> transition;
 }
 
 TEST_CASE("Transition table creation")
 {
+    using FSM::TransitionTable;
+    using FSM::Transition;
+
     using CustomTransitionTable = TransitionTable<
-        State, Transition<State, State::NotInitialized, Event0, State::Initialized>,
-        Transition<State, State::Initialized, Event0, State::Started>,
-        Transition<State, State::Started, Event1, State::Stopped>>;
+        State, Event1, Transition<State, NotInitialized, Event0, Initialized>,
+        Transition<State, Initialized, Event0, Started>,
+        Transition<State, Started, Event1, Stopped>>;
 
     auto a =
-        CustomTransitionTable::TransitionList<Event1>::transitions[int(State::Started)];
+        CustomTransitionTable::transitions[int(Started)];
     REQUIRE(int(a) == 3);
 }
 
 template <typename TransitionList>
 void printTransitionList(const std::string& prefix)
 {
-    for (int i = 0; i < TransitionList::transitions.size(); ++i)
+    for (size_t i = 0; i < TransitionList::transitions.size(); ++i)
     {
-        std::cout << prefix << ": " << i << " -> " << int(TransitionList::transitions[i]) << std::endl;
+        std::cout << prefix << ": " << i << " -> "
+                  << int(TransitionList::transitions[i]) << std::endl;
     }
 }
 
+template <State FromState, typename EventType, State ToState>
+using Transition = FSM::Transition<State, FromState, EventType, ToState>;
+
 TEST_CASE("FSM creation")
 {
-    FSM<State, Transition<State, State::NotInitialized, Event0, State::Initialized>,
-        Transition<State, State::Initialized, Event0, State::Started>,
-        Transition<State, State::Started, Event1, State::Stopped>>
-        fsm(State::NotInitialized);
+    using FSM::FSM;
 
-    printTransitionList<decltype(fsm)::TransitionList<Event0>>("Event0");
-    printTransitionList<decltype(fsm)::TransitionList<Event1>>("Event1");
+    FSM<State,
+        Transition<NotInitialized, Event0, Initialized>,
+        Transition<Initialized, Event0, Started>,
+        Transition<Started, Event1, Stopped>>
+    fsm(NotInitialized);
 
-    REQUIRE(fsm.process(Event0()) == State::Initialized);
-    REQUIRE(fsm.process(Event1()) != State::Started);
+    REQUIRE(fsm.process(Event1()) == NotInitialized);
+    REQUIRE(fsm.process(Event0()) == Initialized);
+    REQUIRE(fsm.process(Event1()) == Initialized);
+    REQUIRE(fsm.process(Event0()) == Started);
+    REQUIRE(fsm.process(Event0()) == Started);
+    REQUIRE(fsm.process(Event1()) == Stopped);
+    REQUIRE(fsm.process(Event0()) == Stopped);
+    REQUIRE(fsm.process(Event1()) == Stopped);
 }
