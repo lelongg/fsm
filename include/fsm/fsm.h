@@ -132,8 +132,8 @@ struct TransitionTable<StateType, EventType, Transition, Transitions...>
     static constexpr auto max_state =
         MaxState<StateType, EventType, Transitions...>();
 
-    static constexpr auto transitions =
-        make_array<std::size_t(max_state + 1)>(TransitionHelper_::getToState);
+//     static constexpr auto transitions =
+//         make_array<std::size_t(max_state + 1)>(TransitionHelper_::getToState);
 };
 
 template <typename StateType, typename EventType>
@@ -143,9 +143,23 @@ struct TransitionTable<StateType, EventType>
 
     static constexpr auto max_state = MaxState<StateType, EventType>();
 
-    static constexpr auto transitions =
-        make_array<std::size_t(max_state + 1)>(TransitionHelper_::getToState);
+//     static constexpr auto transitions =
+//         make_array<std::size_t(max_state + 1)>(TransitionHelper_::getToState);
 };
+
+namespace detail {
+template <typename StateType, typename EventType, typename Transition, typename... Transitions>
+std::array<StateType, std::size_t(MaxState<StateType, EventType, Transitions...>() + 1)> transitions() {
+    using TransitionHelper_ =
+        TransitionHelper<StateType, EventType, Transition, Transitions...>;
+    static std::array<StateType, std::size_t(MaxState<StateType, EventType, Transitions...>() + 1)> transition_array =
+        make_array<std::size_t(MaxState<StateType, EventType, Transitions...>() + 1)>(TransitionHelper_::getToState);
+    return transition_array;
+}
+}
+
+template <typename StateType, typename EventType, typename Transition, typename... Transitions>
+static const auto& transitions = detail::transitions<StateType, EventType, Transition, Transitions...>();
 
 template <typename StateType, typename EventType, typename Transition, typename... Transitions>
 struct TransitionHelper<StateType, EventType, Transition, Transitions...>
@@ -193,7 +207,7 @@ struct FSM
 
         if (TransitionList<Event>::max_state >= state_as_underlying_type)
         {
-            state_ = TransitionList<Event>::transitions[state_as_underlying_type];
+            state_ = transitions<StateType, Event, Transitions...>[state_as_underlying_type];
         }
 
         return state_;

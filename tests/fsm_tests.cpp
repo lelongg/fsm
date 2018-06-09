@@ -59,27 +59,27 @@ TEST_CASE("Transition creation")
 
 TEST_CASE("Transition table creation")
 {
-    using FSM::TransitionTable;
-    using FSM::Transition;
+//     using FSM::TransitionTable;
+//     using FSM::Transition;
+//
+//     using CustomTransitionTable = TransitionTable<
+//         State, Event1, Transition<State, NotInitialized, Event0, Initialized>,
+//         Transition<State, Initialized, Event0, Started>,
+//         Transition<State, Started, Event1, Stopped>>;
 
-    using CustomTransitionTable = TransitionTable<
-        State, Event1, Transition<State, NotInitialized, Event0, Initialized>,
-        Transition<State, Initialized, Event0, Started>,
-        Transition<State, Started, Event1, Stopped>>;
-
-    auto a =
-        CustomTransitionTable::transitions[int(Started)];
-    REQUIRE(int(a) == 3);
+//     auto a =
+//         CustomTransitionTable::transitions[int(Started)];
+//     REQUIRE(int(a) == 3);
 }
 
 template <typename TransitionList>
 void printTransitionList(const std::string& prefix)
 {
-    for (size_t i = 0; i < TransitionList::transitions.size(); ++i)
-    {
-        std::cout << prefix << ": " << i << " -> "
-                  << int(TransitionList::transitions[i]) << std::endl;
-    }
+//     for (size_t i = 0; i < TransitionList::transitions.size(); ++i)
+//     {
+//         std::cout << prefix << ": " << i << " -> "
+//                   << int(TransitionList::transitions[i]) << std::endl;
+//     }
 }
 
 template <State FromState, typename EventType, State ToState>
