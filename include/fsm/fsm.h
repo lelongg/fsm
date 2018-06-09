@@ -8,7 +8,6 @@
 #include <type_traits>
 #include <vector>
 
-/// A type that represents a parameter pack of zero or more integers.
 template <typename T, T... I>
 struct integer_sequence
 {
@@ -76,25 +75,46 @@ struct Transition : VirtualTransition<EventType>
     static const StateType to_state = ToState;
 };
 
-template <class Function, typename Index, std::underlying_type_t<Index>... Indices>
-constexpr auto make_array_helper(
-    Function f,
-    Index,
-    integer_sequence<std::underlying_type_t<Index>, Indices...>)
-    -> std::array<
-        typename std::result_of<Function(std::underlying_type_t<Index>)>::type,
-        sizeof...(Indices)>
+// template <class Function, typename Index, std::underlying_type_t<Index>...
+// Indices> constexpr auto make_array_helper(
+//     Function f, Index, integer_sequence<std::underlying_type_t<Index>,
+//     Indices...>)
+//     -> std::array<
+//         typename
+//         std::result_of<Function(std::underlying_type_t<Index>)>::type,
+//         sizeof...(Indices)>
+// {
+//     return {{f(Indices)...}};
+// }
+//
+// template <typename Index, std::underlying_type_t<Index> N, typename Function>
+// constexpr auto make_array(Function f)
+//     -> std::array<typename
+//     std::result_of<Function(std::underlying_type_t<Index>)>::type, N>
+// {
+//     using underlaying = std::underlying_type_t<Index>;
+//     return make_array_helper(f, Index(), make_integer_sequence<underlaying,
+//     N>{});
+// }
+
+template <class Function, std::size_t... Indices>
+constexpr auto make_array_helper(Function f, index_sequence<Indices...>)
+    -> std::array<typename std::result_of<Function(std::size_t)>::type, sizeof...(Indices)>
 {
     return {{f(Indices)...}};
 }
 
-template <typename Index, std::underlying_type_t<Index> N, typename Function>
+template <int N, class Function>
 constexpr auto make_array(Function f)
-    -> std::array<typename std::result_of<Function(std::underlying_type_t<Index>)>::type, N>
+    -> std::array<typename std::result_of<Function(std::size_t)>::type, N>
 {
-    using underlaying = std::underlying_type_t<Index>;
-    return make_array_helper(
-        f, Index(), make_integer_sequence<underlaying, N>{});
+    return make_array_helper(f, make_index_sequence<N>{});
+}
+
+template <typename StateType, typename EventType, typename... Transitions>
+constexpr std::underlying_type_t<StateType> MaxState()
+{
+    return std::max({Transitions::from_state...});
 }
 
 template <typename StateType, typename EventType, typename... Transitions>
@@ -109,10 +129,11 @@ struct TransitionTable<StateType, EventType, Transition, Transitions...>
     using TransitionHelper_ =
         TransitionHelper<StateType, EventType, Transition, Transitions...>;
 
-    static constexpr auto max_state = TransitionHelper_::maxState();
+    static constexpr auto max_state =
+        MaxState<StateType, EventType, Transitions...>();
 
     static constexpr auto transitions =
-        make_array<StateType, max_state + 1>(TransitionHelper_::getToState);
+        make_array<std::size_t(max_state + 1)>(TransitionHelper_::getToState);
 };
 
 template <typename StateType, typename EventType>
@@ -120,27 +141,16 @@ struct TransitionTable<StateType, EventType>
 {
     using TransitionHelper_ = TransitionHelper<StateType, EventType>;
 
-    static constexpr auto max_state = TransitionHelper_::maxState();
+    static constexpr auto max_state = MaxState<StateType, EventType>();
 
     static constexpr auto transitions =
-        make_array<StateType, max_state + 1>(TransitionHelper_::getToState);
+        make_array<std::size_t(max_state + 1)>(TransitionHelper_::getToState);
 };
 
 template <typename StateType, typename EventType, typename Transition, typename... Transitions>
 struct TransitionHelper<StateType, EventType, Transition, Transitions...>
 {
-    static constexpr std::underlying_type_t<StateType> maxState()
-    {
-        constexpr auto from_state =
-            static_cast<std::underlying_type_t<StateType>>(Transition::from_state);
-        constexpr auto to_state =
-            static_cast<std::underlying_type_t<StateType>>(Transition::to_state);
-        return std::max(
-            std::max(from_state, to_state),
-            TransitionHelper<StateType, EventType, Transitions...>::maxState());
-    }
-
-    static constexpr StateType getToState(const std::underlying_type_t<StateType> from_state)
+    static constexpr StateType getToState(const std::size_t from_state)
     {
         if (std::is_same<typename Transition::Event, EventType>()
             && StateType(from_state) == Transition::from_state)
@@ -158,12 +168,7 @@ struct TransitionHelper<StateType, EventType, Transition, Transitions...>
 template <typename StateType, typename EventType>
 struct TransitionHelper<StateType, EventType>
 {
-    static constexpr std::underlying_type_t<StateType> maxState()
-    {
-        return static_cast<std::underlying_type_t<StateType>>(StateType());
-    }
-
-    static constexpr StateType getToState(const std::underlying_type_t<StateType> from_state)
+    static constexpr StateType getToState(const std::size_t from_state)
     {
         return StateType(from_state);
     }
