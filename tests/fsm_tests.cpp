@@ -2,9 +2,15 @@
 #include <fsm/fsm.h>
 #include <iostream>
 
-struct Event {};
-struct Event0 {};
-struct Event1 {};
+struct Event
+{
+};
+struct Event0
+{
+};
+struct Event1
+{
+};
 
 enum State
 {
@@ -21,11 +27,10 @@ TEST_CASE("FSM")
 {
     using FSM::FSM;
 
-    FSM<State,
-        Transition<NotInitialized, Event0, Initialized>,
+    FSM<State, Transition<NotInitialized, Event0, Initialized>,
         Transition<Initialized, Event0, Started>,
         Transition<Started, Event1, Stopped>>
-    fsm(NotInitialized);
+        fsm(NotInitialized);
 
     REQUIRE(fsm.process(Event1()) == NotInitialized);
     REQUIRE(fsm.process(Event0()) == Initialized);

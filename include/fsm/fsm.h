@@ -16,7 +16,11 @@ struct VirtualTransition
     void operator()(const EventType&) {}
 };
 
-template <typename StateType, StateType FromState, typename EventType, StateType ToState>
+template <
+    typename StateType,
+    StateType FromState,
+    typename EventType,
+    StateType ToState>
 struct Transition : VirtualTransition<EventType>
 {
     using Event = EventType;
@@ -55,7 +59,10 @@ template <
     typename EventType,
     typename Transition,
     typename... Transitions>
-std::array<StateType, std::size_t(MaxState<StateType, EventType, Transitions...>() + 1)> transitions()
+std::array<
+    StateType,
+    std::size_t(MaxState<StateType, EventType, Transitions...>() + 1)>
+transitions()
 {
     using TransitionHelper_ =
         TransitionHelper<StateType, EventType, Transition, Transitions...>;
