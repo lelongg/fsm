@@ -1,5 +1,7 @@
 # FSM
 
+This project is maintained on [gitlab](https://gitlab.com/lelongg/fsm).
+
 ## Overview
 
 FSM is a single header static finite state machine library.
